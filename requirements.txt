@@ -1,0 +1,8 @@
+streamlit
+streamlit-chat
+google-generativeai
+chromadb
+python-dotenv
+opencv-python
+numpy
+pytesseract

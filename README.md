@@ -38,4 +38,7 @@ The Meal Planner App is a humorous and intelligent assistant that helps users pl
    streamlit run app.py
    ```
 
+To test the OCR input the given test image.
+
+
 

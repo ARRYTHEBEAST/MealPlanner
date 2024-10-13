@@ -29,7 +29,7 @@ The Meal Planner App is a humorous and intelligent assistant that helps users pl
    ```
    pip install -r requirements.txt
    ```
-3. Set up your Google API key in a `config.py` file:
+3. Set up your Google API in a new `config.py` file:
    ```python
    GOOGLE_API_KEY = "your_api_key_here"
    ```

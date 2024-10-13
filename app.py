@@ -9,6 +9,10 @@ from dotenv import load_dotenv
 import json
 from datetime import datetime
 import config
+import cv2
+import numpy as np
+import pytesseract
+
 
 load_dotenv()
 
@@ -74,6 +78,39 @@ def get_preferences_prompt():
     return prompt
 
 #Grocery and Inventory Management
+def extract_text_from_receipt(uploaded_file):
+    # Read the image from the uploaded file
+    image = np.array(bytearray(uploaded_file.read()), dtype=np.uint8)
+    img = cv2.imdecode(image, cv2.IMREAD_COLOR)
+
+    # Convert the image to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+
+    # Use Tesseract to extract text
+    custom_config = r'--oem 3 --psm 6'
+    text = pytesseract.image_to_string(thresh, config=custom_config)
+    return text
+
+# Function to parse the text from the receipt
+def parse_receipt_text(text):
+    grocery_list = {}
+    lines = text.splitlines()
+    
+    for line in lines:
+        if line.strip():
+            parts = line.split(',')
+            if len(parts) == 2:
+                item = parts[0].strip()
+                quantity_unit = parts[1].strip().split()
+                if len(quantity_unit) == 2:
+                    quantity, unit = quantity_unit
+                    grocery_list[item] = (float(quantity), unit)
+                else:
+                    # Handle case where quantity/unit might be missing
+                    grocery_list[item] = (1, '')  # Default to 1 if not specified
+    return grocery_list
+
 def load_inventory():
     if os.path.exists(INVENTORY_FILE):
         with open(INVENTORY_FILE, 'r') as f:
@@ -90,13 +127,14 @@ def save_inventory(inventory):
     with open(INVENTORY_FILE, 'w') as f:
         json.dump(inventory, f, indent=2)
 
+# Function to update inventory with grocery list
 def update_inventory(grocery_list):
     inventory = load_inventory()
     for item, (quantity, unit) in grocery_list.items():
         if item in inventory:
-            inventory[item]['quantity'] += quantity  # Assuming inventory[item] is a dict with 'quantity'
+            inventory[item]['quantity'] += quantity  # Update quantity
         else:
-            inventory[item] = {'quantity': quantity, 'unit': unit}  # Initialize the item with quantity and unit
+            inventory[item] = {'quantity': quantity, 'unit': unit}  # Add new item
     save_inventory(inventory)
 
 
@@ -251,7 +289,7 @@ def daily_followup():
 # Streamlit UI
 def main():
     st.set_page_config(page_title="Humorous Meal Planning Assistant", page_icon="🍽️", layout="wide", initial_sidebar_state="expanded")
-
+    
     # Sidebar for user preferences
     st.sidebar.header("User Preferences 🥗")
     preferences = load_preferences()
@@ -270,9 +308,22 @@ def main():
         st.sidebar.success("Preferences updated! Hope you're ready for some culinary adventures!")
 
     # Main area for grocery input and meal planning
-    st.markdown("## Weekly Grocery Input 🛒")
-    grocery_items = st.text_area("Enter your grocery items (one per line, format: item,quantity <space> unit) Please add a space between quantity and unit")
+    st.markdown("## Upload Grocery Receipt 📄")
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+
+    if uploaded_file is not None:
+        receipt_text = extract_text_from_receipt(uploaded_file)
+        st.text_area("Extracted Text from Receipt:", receipt_text, height=200)
+    
+        if st.button("Add to Inventory"):
+            grocery_list = parse_receipt_text(receipt_text)
+            update_inventory(grocery_list)
+            st.success("Inventory updated from receipt!")
+
     if st.button("Update Inventory"):
+        st.markdown("## Weekly Grocery Input 🛒")
+        grocery_items = st.text_area("Enter your grocery items (one per line, format: item,quantity <space> unit) Please add a space between quantity and unit")
+    # if st.button("Update Inventory"):
         grocery_list = {}
         for line in grocery_items.split('\n'):
             if line.strip():
